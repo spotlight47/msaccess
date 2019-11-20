@@ -1,0 +1,39 @@
+Private Sub cmdMap_Click()
+' Purpose:  Display address in Google Maps
+' Author:   Bob Lazo
+' Date:     11 December 2012
+
+' Original code source:  http://osdir.com/ml/GoogleMapsAPI/2009-07/msg02973.html
+
+Dim strLinkUrl As String ' address of provider passed to Google maps in the URL
+Dim strPath As String ' Google maps URL
+Dim strAddr() As String ' used to split up address string
+
+Dim i As Integer ' counter
+
+' this is the URL to Google maps
+strPath = "http://maps.google.com/maps?q="
+
+' setup the address URL to be passed by including the street, city and state
+'strLinkUrl = RTrim(streetnumber.Value) & "+" & RTrim(city.Value) & "+" & RTrim(state.Value)
+strLinkUrl = RTrim(Me.txtADDRESS1.Value) & "+" & RTrim(Me.txtCITY.Value) & "+" & RTrim(Me.txtSTATE.Value)
+
+' split up the address URL so that space between words can be removed.
+strAddr = Split(strLinkUrl, " ", , vbTextCompare)
+
+' piece back each address together with "+"
+strLinkUrl = ""
+
+For i = LBound(strAddr()) To UBound(strAddr())
+    strLinkUrl = strLinkUrl & strAddr(i) & "+"
+Next i
+
+' remove the trailing "+" and include the Google map URL
+strLinkUrl = strPath & Left(strLinkUrl, Len(strLinkUrl) - 1)
+Debug.Print strLinkUrl
+
+' bring up Google maps passing the address
+Me.cmdMap.HyperlinkAddress = strLinkUrl
+
+
+End Sub
