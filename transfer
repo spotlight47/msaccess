@@ -1,0 +1,29 @@
+Private Sub cmdTransfer_Click()
+' Purpose:  Transfer data from the frmContactLookup to the Invoice form
+' Author:  Robert Lazo
+' Date:  7/23/2015
+' Find a way to make this form and function portable from one version to another.
+
+On Error GoTo Err_ErrorTrap
+
+    Me!billing_firstname.Value = Forms!frmContactLookup!billing_firstname.Value
+    Me!billing_lastname.Value = Forms!frmContactLookup!billing_lastname.Value
+    Me!billing_company.Value = Forms!frmContactLookup!billing_company.Value
+    Me!billing_address1.Value = Forms!frmContactLookup!billing_address1.Value
+    Me!billing_address2.Value = Forms!frmContactLookup!billing_address2.Value
+    Me!billing_city.Value = Forms!frmContactLookup!billing_city.Value
+    Me!billing_state.Value = Forms!frmContactLookup!billing_state.Value
+    Me!billing_zip.Value = Forms!frmContactLookup!billing_zip.Value
+    Me!billing_country.Value = "USA"
+    Me!billing_phone.Value = Forms!frmContactLookup!billing_phone.Value
+    Me!billing_email.Value = Forms!frmContactLookup!billing_email.Value
+   
+Exit_Transfer:
+    Exit Sub
+
+Err_ErrorTrap:
+    MsgBox Err.Description
+    Resume Exit_Transfer
+    
+  
+End Sub
