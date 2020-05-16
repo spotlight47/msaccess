@@ -1,0 +1,24 @@
+Sub CreateHyperlinkLabel(strForm As String, xPos As Integer, _
+        yPos As Integer, strCaption As String, Optional strAddress As String, _
+        Optional strSubAddress As String)
+    Dim ctlLabel As Control
+
+    ' Open form, hidden in Design view.
+    DoCmd.OpenForm strForm, acDesign, , , , acHidden
+
+    ' Create label control with text specified by strCaption, at
+    ' the position specified by xPos and yPos.
+    Set ctlLabel = CreateControl(strForm, acLabel, , "", _
+        strCaption, xPos, yPos)
+    
+    ' Set hyperlink address, text color, and underline.
+    With ctlLabel
+        .HyperlinkAddress = strAddress
+        .HyperlinkSubAddress = strSubAddress
+        .ForeColor = "1279872587"
+        .FontUnderline = True
+    End With
+
+    ' Save form.
+    DoCmd.Save acForm, strForm
+End Sub
