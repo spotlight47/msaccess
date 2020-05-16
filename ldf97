@@ -1,0 +1,303 @@
+Option Compare Database
+Option Explicit
+
+  Private Const mcstrMod As String = "lci_basLibErr"
+
+' Set the application title for message boxes
+  Public Const lci_gcstrAppTitle As String = "AES VBA"
+
+' Set the application help file
+  Public Const lci_gcstrAppHelp As String = "AcMain80.Hlp"
+
+' Configure the standard error message strings for this application
+' Created Public in case they are useful elsewhere in the application
+  ' Intro paragraph for error alert
+  Public Const lci_gcstrAppErrIntro As String = _
+    "This application has encountered a problem:"
+  ' Resolution paragraph for error alert
+  Public Const lci_gcstrAppErrResol As String = _
+    "If this problem persists, report the information items " & _
+      "above to Robert Lazo  1-800-215-1844."
+  ' Optional help button paragraph for error alert
+  Public Const lci_gcstrAppErrHelp As String = _
+      "Click Help for support options."
+  ' Optional help button context ID for Tech Support topic
+  
+  Public Const lci_gcintAppErrHelpID As Integer = 1000
+  'Application globals
+  ' lci_gcccDebug, the global debug flag, is set in the Options dialog
+  ' Add New marker for combo boxes, fed from zstblAddNew
+  Public lci_gstrAddNew As String
+  ' Current application user, fed during login
+  Public lci_gstrCurrentUser As String
+  ' Standard delimited list separator
+  Public Const lci_gcstrListDelim As String = "|"
+
+' rl_BasLibErr, Version 6/3/97
+' Standard error handling routines
+' Copyright (c) 1997 Robert Lazo Training & Consulting
+' May not be used without permission
+' All routines here should start with 'rl_'
+' Library dependencies:
+    'rl_basLibGenl.rl_IsBlank()
+    'rl_basLibInit.gtstrCurrentUser()
+' Index:
+    '
+    '
+
+Sub rl_generic()
+' Purpose:
+' Arguments:
+'
+'
+'
+' Authors:
+' Example:
+' Called by:
+' Calls:
+' Returns:
+' Notes:
+' ------------------------------------------------------------------------
+End Sub
+
+Public Sub lci_ErrMsgStd(rstrProc As String, rlngErr As Long, rstrDesc As String, rblnLog As Boolean _
+    , Optional ovarResol As Variant, Optional olngHelpID As Long = -1)
+    
+' Purpose:              Standard error message display
+' Arguments:            rstrProc      :=Module and procedure name
+'                                rlngErr         :=Err number
+'                                rstrDec        :=Error description
+'                               rblLog          :=True/False=add to error log table
+'                               ovarResol   :=Resolution string, if Missing uses global
+'                               olngHelpID :=Help context ID, -1=none (default)
+'                                                   ,0 = app default, >0=ID to call
+' Example:          Call lci_ErrMsgStd(Me.Name & "." & cstrProc, Err.Number,
+'                           Err.Description, True, "Compact the database.", 128)
+' Calls:                lci_ErrLog
+' Pseudo Code:
+'   1.  Build the Problem message section from the argument values
+'   2.  Add Jet/ODBC information from the Errors collection
+'   3.  Add a standard resolution string and app title string
+'   4.  Show the message with the appropriate message box buttons
+'   5.  Log the error to a table if requested
+' ----------------------------------------------------------------------------------------------------------
+On Error GoTo lci_ErrorMsgStd_Err
+Const cstrProc As String = "lci_ErrMsgStd"
+Dim errJet As Error
+Dim strDAOMsg As String
+Dim strMsg As String
+strMsg = "Problem@" & lci_gcstrAppErrIntro & vbCrLf & vbCrLf
+strMsg = strMsg & "Message:  " & lci_ErrMsgFixup(rstrDesc) _
+& "  [" & CStr(rlngErr) & "]" & vbCrLf & vbCrLf
+strMsg = strMsg & "Routine:  " & rstrProc
+
+' If Jet errors were found, add them to the message
+If DBEngine.Errors.Count > 1 Then
+    If DBEngine.Errors(DBEngine.Errors.Count - 1).Number = rlngErr Then
+        For Each errJet In DBEngine.Errors
+            With errJet
+                strDAOMsg = strDAOMsg & "  " _
+                & "[" & CStr(.Number) & " in " & .Source & "]"
+            End With
+        Next
+        strMsg = strMsg & vbCrLf & vbCrLf & "Details" & strDAOMsg
+        End If
+    End If
+    
+If IsMissing(ovarResol) Then
+    strMsg = strMsg & "@Suggestion:  " & lci_gcstrAppErrResol
+Else
+    strMsg = strMsg & "@Suggestion: " & ovarResol
+End If
+
+If olngHelpID > -1 Then     ' Will have Help button, add help text
+    strMsg = strMsg & " " & lci_gcstrAppErrHelp
+End If
+Beep
+If olngHelpID = -1 Then ' No Help button
+    MsgBox strMsg, vbOKOnly + vbCritical, lci_gcstrAppTitle
+ElseIf olngHelpID = 0 Then 'use the default ID
+    MsgBox strMsg, vbOKOnly + vbCritical, lci_gcstrAppTitle _
+        , lci_gcstrAppHelp, lci_gcintAppErrHelpID
+ElseIf olngHelpID > 0 Then ' Use the argument ID
+    MsgBox strMsg, vbOKOnly + vbCritical, lci_gcstrAppTitle _
+    , lci_gcstrAppHelp, olngHelpID
+Else    ' Error, bad ID
+    MsgBox "Problem@Invalid value ' " & CStr(olngHelpID) _
+        & "' passed to error handler ' " & mcstrMod & "." _
+        & cstrProc & "'.", _
+        vbOKOnly + vbCritical, lci_gcstrAppTitle
+    GoTo lci_ErrorMsgStd_Exit
+End If
+
+If rblnLog Then
+    Call lci_ErrLog(rlngErr, rstrProc, strMsg)
+End If
+
+lci_ErrorMsgStd_Exit:
+    On Error Resume Next
+    Exit Sub
+    
+lci_ErrorMsgStd_Err:
+    ' In a failure, this routine should not call itself
+Beep
+
+strMsg = "Problem@This application has encoutered a problem ' " _
+    & Err.Description & " [" & CStr(Err.Number) _
+    & "]' in the error display handler ' " & mcstrMod _
+    & "." & cstrProc & "'." & "@" & lci_gcstrAppErrResol
+  MsgBox strMsg, vbOKOnly + vbCritical, lci_gcstrAppTitle
+Resume lci_ErrorMsgStd_Exit
+    
+End Sub
+Public Sub lci_ErrLog(rlngErr As Long, rstrProc As String, rstrDesc As String)
+' Purpose:   Write error log record to zstlogError
+' Arguments: rlngErr:=Error number
+'            rstrProc:=Module and procedure name
+'            rstrDesc:=Err.Description or similar string to log
+' Called By: lci_ErrMsgStd
+' Calls:     lci_IsBlank
+
+  Const cstrProc As String = "lci_ErrLog"
+  On Error GoTo lci_ErrLog_Err
+  
+  Dim dbs    As Database
+  Dim rst    As Recordset
+  Dim strMsg As String
+  
+  Set dbs = CurrentDb
+  Set rst = dbs.OpenRecordset("zstlogErr", dbOpenDynaset)
+  rst.AddNew
+  rst!ErrWhen = Now
+  rst!ErrProcName = rstrProc
+  
+  ' Occasionally during debugging the global user name has not been set
+  If lci_IsBlank(lci_gstrCurrentUser) Then
+    rst!ErrUserName = CurrentUser()
+  Else
+    rst!ErrUserName = lci_gstrCurrentUser
+  End If
+  rst!ErrNumber = rlngErr
+  rst!ErrDescription = rstrDesc
+  rst.Update
+  
+lci_ErrLog_Exit:
+  On Error Resume Next
+  rst.Close
+  dbs.Close
+  Exit Sub
+  
+lci_ErrLog_Err:
+  ' Note: The error log table should be in the shared back-end database,
+  '       and one possible error that would jump the code here would be
+  '       a failure to find that back-end. Such a condition could be trapped
+  '       here and the system could present a user message, send an e-mail
+  '       to HelpDesk, or otherwise provide special handling of the situation,
+  '       given the fact that writing to the error table is not an option.
+  ' In a failure, this routine should not call lci_ErrMsgStd, which would cause recursion
+  Beep
+  strMsg = "Problem@This application has encountered a problem '" _
+    & Err.Description & " [" & CStr(Err.Number) _
+    & "]' in the error log handler '" & mcstrMod _
+    & "." & cstrProc & "'." & "@" & lci_gcstrAppErrResol
+  MsgBox strMsg, vbOKOnly + vbCritical, lci_gcstrAppTitle
+  Resume lci_ErrLog_Exit
+  
+End Sub
+Public Function lci_IsBlank(rvar As Variant) As Boolean
+' Purpose:   Test a string for null or zero length
+' Arguments: String to check
+' Returns:   True/False, True=value is Null or zero-length
+' Example:   lci_IsBlank(strWork)
+
+  On Error GoTo lci_IsBlank_Err
+  Const cstrProc As String = "lci_IsBlank"
+  
+  If IsNull(rvar) Then
+    lci_IsBlank = True
+    GoTo lci_IsBlank_Exit
+  End If
+  If Len(rvar) = 0 Then
+    lci_IsBlank = True
+    GoTo lci_IsBlank_Exit
+  End If
+  lci_IsBlank = False
+
+lci_IsBlank_Exit:
+  On Error Resume Next
+  Exit Function
+
+lci_IsBlank_Err:
+  Call lci_ErrMsgStd(mcstrMod & "." & cstrProc, Err.Number, Err.Description, True)
+  Resume lci_IsBlank_Exit
+
+End Function
+
+Public Function lci_ErrMsgFixup(rvarDesc As Variant) As String
+' Purpose:   Remove @ signs from an Err.Description string where possible
+'            Access does not remove these placeholders from its string
+'            Example: You canceled the previous operation.@@@1@5738@1
+' Arguments: rvarDesc:=Error description string to fixup
+' Returns:   Cleaned-up string or zero length string
+' Called By: lci_ErrMsgStd
+' Calls:     lci_IsBlank
+
+  Const cstrProc As String = "lci_ErrMsgFixup"
+  On Error GoTo lci_ErrMsgFixup_Err
+  
+  Dim intLoc     As Integer  ' Location of @ sign
+  Dim intNoMatch As Integer  ' Count non matches
+  Dim strMsg     As String   ' Error message
+  Dim strTest    As String   ' Work string
+  
+  If lci_IsBlank(rvarDesc) Then
+    lci_ErrMsgFixup = ""
+    GoTo lci_ErrMsgFixup_Exit
+  End If
+  strTest = Right(rvarDesc, 2)
+  ' If string has any @ signs at end, they will appear within the last two positions
+  If strTest Like "?@" Or strTest Like "@?" Then
+    ' Walk backwards till five characters found without @ sign
+    intNoMatch = 0
+    For intLoc = Len(rvarDesc) To 1 Step -1
+      If Mid(rvarDesc, intLoc, 1) = "@" Then
+        intNoMatch = 0
+      Else
+        intNoMatch = intNoMatch + 1
+      End If
+      If intNoMatch = 5 Then  ' Stop looking for more @ signs
+        Exit For
+      End If
+    Next intLoc
+    ' Walk forwards back to the @ sign
+    For intLoc = intLoc To Len(rvarDesc)
+      If Mid(rvarDesc, intLoc, 1) = "@" Then  ' Victim found
+        Exit For
+      End If
+    Next intLoc
+    ' intLoc now points to the beginning of the string to kill
+    rvarDesc = Left(rvarDesc, intLoc - 1)
+  End If
+  ' Now remove embedded @ signs
+  intLoc = InStr(rvarDesc, "@")
+  Do While intLoc > 0
+    rvarDesc = Left(rvarDesc, intLoc - 1) & Mid(rvarDesc, intLoc + 1)
+    intLoc = InStr(rvarDesc, "@")
+  Loop
+  lci_ErrMsgFixup = rvarDesc
+  
+lci_ErrMsgFixup_Exit:
+  Exit Function
+
+lci_ErrMsgFixup_Err:
+  ' In a failure, this routine should not call lci_ErrMsgStd, which would cause recursion
+  Beep
+  strMsg = "Problem@This application has encountered a problem '" _
+    & Err.Description & " [" & CStr(Err.Number) _
+    & "]' in the error string handler '" & mcstrMod _
+    & "." & cstrProc & "'." & "@" & lci_gcstrAppErrResol
+  MsgBox strMsg, vbOKOnly + vbCritical, lci_gcstrAppTitle
+  Resume lci_ErrMsgFixup_Exit
+
+End Function
+
